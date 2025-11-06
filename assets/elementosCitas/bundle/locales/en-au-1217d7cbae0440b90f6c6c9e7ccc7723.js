@@ -1,0 +1,1 @@
+!function(global,factory){"object"==typeof exports&&"undefined"!=typeof module?module.exports=factory():"function"==typeof define&&define.amd?define(factory):(global=global||self,global.FullCalendarLocales=global.FullCalendarLocales||{},global.FullCalendarLocales["en-au"]=factory())}(this,function(){"use strict";var enAu={code:"en-au",week:{dow:1,doy:4}};return enAu});

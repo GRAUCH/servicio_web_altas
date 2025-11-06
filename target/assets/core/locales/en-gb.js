@@ -1,0 +1,1 @@
+!function(global,factory){"object"==typeof exports&&"undefined"!=typeof module?module.exports=factory():"function"==typeof define&&define.amd?define(factory):(global=global||self,global.FullCalendarLocales=global.FullCalendarLocales||{},global.FullCalendarLocales["en-gb"]=factory())}(this,function(){"use strict";var enGb={code:"en-gb",week:{dow:1,doy:4}};return enGb});

@@ -1,0 +1,1 @@
+<g:include view="/busquedaAma/poliza.gsp" />
