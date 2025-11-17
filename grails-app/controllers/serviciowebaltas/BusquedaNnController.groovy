@@ -65,107 +65,101 @@ class BusquedaNnController {
      */
     def buscar(params) {
 
-        if (params.dni.isEmpty()) {
-            log.info 'No se ha introducido ningun DNI para recuperar'
-            data.existeError = true
-        }  else {
+        log.info("Obteniendo token para valores dni: " + params.dni + " y poliza: " + params.poliza)
 
-            log.info("Obteniendo token para valores dni: " + params.dni + " y poliza: " + params.poliza)
+        boolean viejoSistemaError = false;
+        boolean nuevoSistemaError = false;
 
-            boolean viejoSistemaError = false;
-            boolean nuevoSistemaError = false;
+        busquedaRestNnService.cleanData()
+        session.setAttribute("clienteRestData", null)
+        session.setAttribute("xmlString",null)
 
-            busquedaRestNnService.cleanData()
-            session.setAttribute("clienteRestData", null)
-            session.setAttribute("xmlString",null)
+        try {
+            //log.info("WSDL: ${grailsApplication.config.nn.wsdl}")
+            //log.info("userNN: ${grailsApplication.config.nn.user}")
+            //log.info("passNN: ${grailsApplication.config.nn.pass}")
 
-            try {
-                //log.info("WSDL: ${grailsApplication.config.nn.wsdl}")
-                //log.info("userNN: ${grailsApplication.config.nn.user}")
-                //log.info("passNN: ${grailsApplication.config.nn.pass}")
+            log.info "Obteniendo token del servicio WSDL"
+            token = busquedaNnService.obtenerToken(grailsApplication.config.nn.wsdl, params.dni.trim(), params.poliza.trim(), grailsApplication.config.nn.pass, grailsApplication.config.nn.user)
 
-                log.info "Obteniendo token del servicio WSDL"
-                token = busquedaNnService.obtenerToken(grailsApplication.config.nn.wsdl, params.dni.trim(), params.poliza.trim(), grailsApplication.config.nn.pass, grailsApplication.config.nn.user)
+            if (token == null || token?.existeError) {
+                log.info "No se ha obtenido el token del servicio WSDL"
+                if (token)
+                    flash.error = token?.getMsgError()?.toString()
+                viejoSistemaError = true
+            } else {
+                //Se obtienen los datos del sistema antiguo
+                log.info "Token obtenido del servicio WSDL"
+                log.info "Obteniendo informacion cliente del servicio WSDL"
+                infoCliente = busquedaNnService.obtenerInfoCliente(grailsApplication.config.nn.wsdl, token.getValor(), params.dni.trim(), params.producto.trim(), params.poliza.trim())
 
-                if (token == null || token?.existeError) {
-                    log.info "No se ha obtenido el token del servicio WSDL"
-                    if (token)
-                        flash.error = token?.getMsgError()?.toString()
+                if (infoCliente.existeError) {
+                    log.info "No se ha obtenido la informacion de cliente del servicio WSDL"
+                    log.info infoCliente.getMsgError().toString()
+                    flash.error = "No se ha obtenido la información del cliente del servicio WSDL con dni: " + params.dni.trim() + ". Contactar con IT"
                     viejoSistemaError = true
                 } else {
-                    //Se obtienen los datos del sistema antiguo
-                    log.info "Token obtenido del servicio WSDL"
-                    log.info "Obteniendo informacion cliente del servicio WSDL"
-                    infoCliente = busquedaNnService.obtenerInfoCliente(grailsApplication.config.nn.wsdl, token.getValor(), params.dni.trim(), params.producto.trim(), params.poliza.trim())
-
-                    if (infoCliente.existeError) {
-                        log.info "No se ha obtenido la informacion de cliente del servicio WSDL"
-                        log.info infoCliente.getMsgError().toString()
-                        flash.error = "No se ha obtenido la información del cliente del servicio WSDL con dni: " + params.dni.trim() + ". Contactar con IT"
-                        viejoSistemaError = true
-                    } else {
-                        log.info "Informacion cliente obtenida del servicio WSDL"
-                        flash.error = ""
-                        session.setAttribute("xmlString", infoCliente.getDatos().xmlText())
-                    }
+                    log.info "Informacion cliente obtenida del servicio WSDL"
+                    flash.error = ""
+                    session.setAttribute("xmlString", infoCliente.getDatos().xmlText())
                 }
-            } catch (Exception e) {
-                def exception = new GestionException(this.getClass(), "buscar", e)
-                log.error "Usuario del servicio WSDL " + userDetails?.getUsername() + "-" + exception.toString()
-                log.error e.printStackTrace()
-                if (flash.error != null) {
-                    flash.error = token?.getMsgError()?.toString()
-                    log.info "Usuario del servicio WSDL" + userDetails?.getUsername() + "-" + token?.getMsgError()?.toString()
-                } else {
-                    flash.error = "Error al obtener el token de seguridad del servicio WSDL. Contactar con IT"
-                    log.info "Error al obtener el token de seguridad del servicio WSDL. Contactar con IT"
-                }
-                viejoSistemaError = true
-
             }
+        } catch (Exception e) {
+            def exception = new GestionException(this.getClass(), "buscar", e)
+            log.error "Usuario del servicio WSDL " + userDetails?.getUsername() + "-" + exception.toString()
+            log.error e.printStackTrace()
+            if (flash.error != null) {
+                flash.error = token?.getMsgError()?.toString()
+                log.info "Usuario del servicio WSDL" + userDetails?.getUsername() + "-" + token?.getMsgError()?.toString()
+            } else {
+                flash.error = "Error al obtener el token de seguridad del servicio WSDL. Contactar con IT"
+                log.info "Error al obtener el token de seguridad del servicio WSDL. Contactar con IT"
+            }
+            viejoSistemaError = true
 
-            try {
-                log.info "Obteniendo informacion del cliente REST_API con dni " + params.dni.trim()
-                clienteRestData = busquedaRestNnService.obtenerInfoClienteByDni(params.dni.trim())
+        }
 
-                if (clienteRestData.getTokenError()) {
-                    flash.error = "Error al obtener el token de seguridad del cliente REST_API. Contactar con IT"
+        try {
+            log.info "Obteniendo informacion del cliente REST_API con dni " + params.dni.trim()
+            clienteRestData = busquedaRestNnService.obtenerInfoClienteByDni(params.dni.trim())
+
+            if (clienteRestData.getTokenError()) {
+                flash.error = "Error al obtener el token de seguridad del cliente REST_API. Contactar con IT"
+                nuevoSistemaError = true
+            } else {
+
+                if (clienteRestData.existeError) {
+                    log.info "No se ha obtenido la informacion de cliente REST_API"
+                    flash.error = "No se ha obtenido la información del cliente REST_API con dni: " + params.dni.trim() + ". Contactar con IT"
                     nuevoSistemaError = true
                 } else {
-
-                    if (clienteRestData.existeError) {
-                        log.info "No se ha obtenido la informacion de cliente REST_API"
-                        flash.error = "No se ha obtenido la información del cliente REST_API con dni: " + params.dni.trim() + ". Contactar con IT"
-                        nuevoSistemaError = true
-                    } else {
-                        log.info "Si se ha obtenido la informacion de cliente del REST_API"
-                        flash.error = ""
-                        session.setAttribute("clienteRestData", clienteRestData)
-                    }
+                    log.info "Si se ha obtenido la informacion de cliente del REST_API"
+                    flash.error = ""
+                    session.setAttribute("clienteRestData", clienteRestData)
                 }
-
-
-            } catch (Exception e) {
-                log.error e.printStackTrace()
-                flash.error = "Error al obtener informacion del cliente REST_API. Contactar con IT"
-                nuevoSistemaError = true
             }
 
 
+        } catch (Exception e) {
+            log.error e.printStackTrace()
+            flash.error = "Error al obtener informacion del cliente REST_API. Contactar con IT"
+            nuevoSistemaError = true
+        }
 
-            //Se comprueba que el cliente buscado no este en ninguno de los dos sistemas para devolver error
-            if (!(viejoSistemaError && nuevoSistemaError)) {
-                flash.error = ""
-            }
 
 
-            // si el atributo error no esta vacio se renderiza para mostrarlo por pantalla
-            if (!flash?.error?.empty) {
-                log.error "Usuario del cliente REST_API" + userDetails?.getUsername() + "-" + flash?.error
-                render view: 'contenido', model: [flash: flash]
-            } else {
-                redirect(action: "resultados")
-            }
+        //Se comprueba que el cliente buscado no este en ninguno de los dos sistemas para devolver error
+        if (!(viejoSistemaError && nuevoSistemaError)) {
+            flash.error = ""
+        }
+
+
+        // si el atributo error no esta vacio se renderiza para mostrarlo por pantalla
+        if (!flash?.error?.empty) {
+            log.error "Usuario del cliente REST_API" + userDetails?.getUsername() + "-" + flash?.error
+            render view: 'contenido', model: [flash: flash]
+        } else {
+            redirect(action: "resultados")
         }
     }
 
@@ -344,21 +338,34 @@ class BusquedaNnController {
 
                     Element eElement = (Element) nNode;
 
-                    // Función auxiliar para obtener texto seguro
+                    // Función auxiliar para obtener texto seguro con logging
                     def getText = { String tag ->
-                        def node = eElement.getElementsByTagName(tag).item(0)
-                         if (node == null) {
-                            log.warn "Campo '${tag}' no encontrado en la poliza."
+                        def node = eElement.getElementsByTagName(tag)?.item(0)
+                        if (node == null) {
+                            log.warn "Campo '${tag}' no encontrado en la póliza."
                             return null
                         }
                         def text = node.getTextContent()?.trim()
                         if (!text) {
-                            log.warn "Campo '${tag}' está vacío en la poliza."
+                            log.warn "Campo '${tag}' está vacío en la póliza."
+                            return null
                         }
                         return text
                     }
 
-                    // Validación de enteros
+                    // FECEFECTO
+                    def fechaEfectoStr = getText("FECEFECTO")
+                    if (fechaEfectoStr) {
+                        fechaEfecto = fechaEfectoStr
+                    }
+
+                    // FECVTOCOBRO
+                    def fechaVtoCobroStr = getText("FECVTOCOBRO")
+                    if (fechaVtoCobroStr) {
+                        fechaVctCobro = fechaVtoCobroStr
+                    }
+
+                    // DIASFRANQUICIA
                     def diasStr = getText("DIASFRANQUICIA")
                     if (diasStr) {
                         try {
@@ -368,6 +375,7 @@ class BusquedaNnController {
                         }
                     }
 
+                    // DUR_RENTA
                     def duracionStr = getText("DUR_RENTA")
                     if (duracionStr) {
                         try {
@@ -375,6 +383,12 @@ class BusquedaNnController {
                         } catch (NumberFormatException e) {
                             log.warn "DUR_RENTA no es un número válido: '${duracionStr}'"
                         }
+                    }
+
+                    // FORMAPAGO
+                    def formaPagoStr = getText("FORMAPAGO")
+                    if (formaPagoStr) {
+                        formaDePago = formaPagoStr
                     }
 
                     PolizaMapper poliza = new PolizaMapper(
