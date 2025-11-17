@@ -1,37 +1,61 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# =========================================
+# 🦄 Grails 2.x project
+# =========================================
+/target/
+/out/
+/build/
+/stacktrace.log
+/test/reports/
+/test-results/
+/web-app/WEB-INF/classes/
+/web-app/plugins/
+/.grails/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+# Grails work directories
+/.grails-plugins/
+/.grails-work/
+/tmp/
+/war/
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# Plugin cache
+/.plugin-cache/
+
+# =========================================
+# ☕ Java / Groovy build artifacts
+# =========================================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar
+*.tar.gz
+
+# =========================================
+# 🧠 IntelliJ IDEA
+# =========================================
+.idea/
 *.iml
 *.ipr
+*.iws
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+*.swp
+*.swo
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# =========================================
+# 🪟 OS-specific files
+# =========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-### VS Code ###
-.vscode/
+# =========================================
+# 🧰 Logs / temporales
+# =========================================
+*.log
+*.tmp
+*.bak
+*.swp
+*.orig
+*.rej

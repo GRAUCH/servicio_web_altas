@@ -344,34 +344,21 @@ class BusquedaNnController {
 
                     Element eElement = (Element) nNode;
 
-                    // Función auxiliar para obtener texto seguro con logging
+                    // Función auxiliar para obtener texto seguro
                     def getText = { String tag ->
-                        def node = eElement.getElementsByTagName(tag)?.item(0)
-                        if (node == null) {
-                            log.warn "Campo '${tag}' no encontrado en la póliza."
+                        def node = eElement.getElementsByTagName(tag).item(0)
+                         if (node == null) {
+                            log.warn "Campo '${tag}' no encontrado en la poliza."
                             return null
                         }
                         def text = node.getTextContent()?.trim()
                         if (!text) {
-                            log.warn "Campo '${tag}' está vacío en la póliza."
-                            return null
+                            log.warn "Campo '${tag}' está vacío en la poliza."
                         }
                         return text
                     }
 
-                    // FECEFECTO
-                    def fechaEfectoStr = getText("FECEFECTO")
-                    if (fechaEfectoStr) {
-                        fechaEfecto = fechaEfectoStr
-                    }
-
-                    // FECVTOCOBRO
-                    def fechaVtoCobroStr = getText("FECVTOCOBRO")
-                    if (fechaVtoCobroStr) {
-                        fechaVctCobro = fechaVtoCobroStr
-                    }
-
-                    // DIASFRANQUICIA
+                    // Validación de enteros
                     def diasStr = getText("DIASFRANQUICIA")
                     if (diasStr) {
                         try {
@@ -381,7 +368,6 @@ class BusquedaNnController {
                         }
                     }
 
-                    // DUR_RENTA
                     def duracionStr = getText("DUR_RENTA")
                     if (duracionStr) {
                         try {
@@ -389,12 +375,6 @@ class BusquedaNnController {
                         } catch (NumberFormatException e) {
                             log.warn "DUR_RENTA no es un número válido: '${duracionStr}'"
                         }
-                    }
-
-                    // FORMAPAGO
-                    def formaPagoStr = getText("FORMAPAGO")
-                    if (formaPagoStr) {
-                        formaDePago = formaPagoStr
                     }
 
                     PolizaMapper poliza = new PolizaMapper(
