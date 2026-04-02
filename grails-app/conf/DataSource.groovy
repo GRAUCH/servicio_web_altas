@@ -53,23 +53,14 @@ environments {
         println "Carga configuración datasource 'local'"
         dataSource {
             //BD local
-            dbCreate = "update" // one of 'create', 'create-drop','update'
+            pooled = true
+            dbCreate = "validate" // one of 'create', 'create-drop','update'
             username = "postgres"
             password = "postgres"
-            url = "jdbc:postgresql://localhost:5432/webaltascitas"
+            url = "jdbc:postgresql://localhost:5432/webcitas_prepro_local"
             driverClassName = "org.postgresql.Driver"
             dialect = "org.hibernate.dialect.PostgreSQLDialect"
-
-/*
-            //BD devloptment
-            dbCreate = "update" // one of 'create', 'create-drop','update'
-            username = "admintuw"
-            password = "hwsol2015"
-            url = "jdbc:postgresql://172.17.0.161:5432/webaltascitas"
-            driverClassName = "org.postgresql.Driver"
-            dialect = "org.hibernate.dialect.PostgreSQLDialect"
-*/
-
+            jndiName = "" // <-- forzamos que no use JNDI
             properties {
                 // See http://grails.org/doc/latest/guide/conf.html#dataSource for documentation
                 jmxEnabled = true
@@ -96,8 +87,35 @@ environments {
     development {
         println "Carga configuración datasource 'development'"
         dataSource {
-            dbCreate = "update" // one of 'create', 'create-drop','update'
-            jndiName = "java:jboss/datasources/ds_webaltascitas" //Es necesario crearlo en el wildfly
+            //BD local
+            pooled = true
+            dbCreate = "validate" // one of 'create', 'create-drop','update'
+            username = "postgres"
+            password = "postgres"
+            url = "jdbc:postgresql://localhost:5432/webcitas_prepro_local"
+            driverClassName = "org.postgresql.Driver"
+            dialect = "org.hibernate.dialect.PostgreSQLDialect"
+            jndiName = "" // <-- forzamos que no use JNDI
+            properties {
+                // See http://grails.org/doc/latest/guide/conf.html#dataSource for documentation
+                jmxEnabled = true
+                initialSize = 5
+                maxActive = 50
+                minIdle = 5
+                maxIdle = 25
+                maxWait = 10000
+                maxAge = 10 * 60000
+                timeBetweenEvictionRunsMillis = 5000
+                minEvictableIdleTimeMillis = 60000
+                validationQuery = "SELECT 1"
+                validationQueryTimeout = 3
+                validationInterval = 15000
+                testOnBorrow = true
+                testWhileIdle = true
+                testOnReturn = false
+                jdbcInterceptors = "ConnectionState"
+                defaultTransactionIsolation = java.sql.Connection.TRANSACTION_READ_COMMITTED
+            }
         }
     }
 

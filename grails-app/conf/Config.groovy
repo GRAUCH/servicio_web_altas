@@ -4,18 +4,33 @@ grails.gorm.default.mapping = {
     id generator: 'seqhilo', params: [max_lo: 1000]
 }
 
+def logPath = "./logs"  // default (local)
+
+environments {
+    production {
+        logPath = "/var/log/wildfly/appLogs/webaltascitas"
+    }
+    preproduction {
+        logPath = "/var/log/wildfly/appLogs/webaltascitas"
+    }
+    test {
+        logPath = "/var/log/wildfly/appLogs/webaltascitas"
+    }
+}
+
+
 log4j = {
     appenders {
         appender new DailyRollingFileAppender(
                 name: 'appenderNN',
                 datePattern: "'.'yyyy-MM-dd",  // See the API for all patterns.
-                fileName: '/var/log/wildfly/appLogs/webaltascitas/serviciowebaltasnn.log',
+                fileName: "${logPath}/serviciowebaltasnn.log",
                 layout: pattern(conversionPattern:'%d [%t] %-5p %c{2} %x - %m%n')
         )
         appender new DailyRollingFileAppender(
                 name: 'appenderAMA',
                 datePattern: "'.'yyyy-MM-dd",  // See the API for all patterns.
-                fileName: '/var/log/wildfly/appLogs/webaltascitas/serviciowebaltasama.log',
+                fileName: "${logPath}/serviciowebaltasama.log",
                 layout: pattern(conversionPattern:'%d [%t] %-5p %c{2} %x - %m%n')
         )
     }
@@ -46,7 +61,7 @@ log4j = {
 //grails.plugin.springsecurity.ldap.authorities.retrieveDatabaseRoles = true
 grails.plugin.springsecurity.ldap.context.managerDn = 'admin-qurius'
 grails.plugin.springsecurity.ldap.context.managerPassword = 'd!vz#GW7xw9'
-grails.plugin.springsecurity.ldap.context.server = 'ldap://172.22.0.3:389'
+grails.plugin.springsecurity.ldap.context.server = 'ldap://172.26.0.3:389'
 grails.plugin.springsecurity.ldap.authorities.ignorePartialResultException = true // typically needed for Active Directory
 grails.plugin.springsecurity.ldap.search.base = 'DC=scor-telemed,DC=local'
 grails.plugin.springsecurity.ldap.search.filter = 'sAMAccountName={0}' // for Active Directory you need this

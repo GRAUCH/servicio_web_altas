@@ -7,7 +7,7 @@
                 <a role="button" style="font-size: 15;
                 font-family: arial;"
                    class="dropdown-toggle" data-toggle="dropdown"><asset:image
-                        src="agente.png" style="width:30px;"/> ${sec.loggedInUserInfo(field: 'fullname')}
+                        src="agente.png" style="width:30px;"/> ${principal?.attributes?.get("displayName")?.get(0) ?: principal?.username}
                 </a>
                 <hr style="border: 0.1px solid #666666;">
             </div>

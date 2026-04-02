@@ -59,3 +59,25 @@ Desktop.ini
 *.swp
 *.orig
 *.rej
+
+logs/
+
+# Assets pipeline
+target/assets/
+*.gz
+
+# Compiled classes
+*.class
+
+# IntelliJ / Eclipse
+.idea/
+*.iml
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
