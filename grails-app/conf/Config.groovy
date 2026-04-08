@@ -25,13 +25,13 @@ log4j = {
                 name: 'appenderNN',
                 datePattern: "'.'yyyy-MM-dd",  // See the API for all patterns.
                 fileName: "${logPath}/serviciowebaltasnn.log",
-                layout: pattern(conversionPattern:'%d [%t] %-5p %c{2} %x - %m%n')
+                layout: pattern(conversionPattern:'%d %-5p %c{2} %x - %m%n')
         )
         appender new DailyRollingFileAppender(
                 name: 'appenderAMA',
                 datePattern: "'.'yyyy-MM-dd",  // See the API for all patterns.
                 fileName: "${logPath}/serviciowebaltasama.log",
-                layout: pattern(conversionPattern:'%d [%t] %-5p %c{2} %x - %m%n')
+                layout: pattern(conversionPattern:'%d %-5p %c{2} %x - %m%n')
         )
     }
 

@@ -1,7 +1,6 @@
 package serviciowebaltas
 
 import com.amaseguros.saludenfermedad.webservices.ConsultaPolizasEnfermedadesStub
-import com.scor.www.CreacionExpedienteAsyncSRP.CreacionExpedienteAsyncSRP_ServiceLocator
 import com.scor.www.SRPFileInbound.*
 import com.scortelemed.servicios.*
 import org.apache.axis.types.Token
@@ -19,12 +18,72 @@ import javax.xml.datatype.XMLGregorianCalendar
 import java.rmi.RemoteException
 import java.text.DateFormat
 import java.text.SimpleDateFormat
+import groovy.json.JsonSlurper
+import org.apache.commons.logging.Log
+import org.apache.commons.logging.LogFactory
+import serviciowebaltasnn.Conf
 
 class BusquedaAmaService {
 
     def commonService
+    private static Log log = LogFactory.getLog("logAMA." + BusquedaAmaService.class.getName())
 
-    def serviceMethod() {
+    def getConfig() {
+        [
+                api_user          : Conf.findByName("API_USER")?.value,
+                api_pass          : Conf.findByName("API_PASSWORD")?.value,
+                api_url_token     : Conf.findByName("API_URL_TOKEN")?.value,
+                api_token_username: Conf.findByName("API_TOKEN_USERNAME")?.value,
+                api_token_pass    : Conf.findByName("API_TOKEN_PASSWORD")?.value,
+                api_wsdl_url      : Conf.findByName("API_WSDL_URL")?.value
+        ]
+    }
+
+    def tokenCache = [
+            token: null,
+            expiration: 0
+    ]
+
+    def obtenerToken(username, password, url_token) {
+        def url = new URI(url_token).toURL()
+        def conn = (HttpURLConnection) url.openConnection()
+
+        conn.setRequestMethod("POST")
+        conn.setDoOutput(true)
+
+        String auth = username + ":" + password
+        String encodedAuth = Base64.encoder.encodeToString(auth.getBytes("UTF-8"))
+        conn.setRequestProperty("Authorization", "Basic " + encodedAuth)
+
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+
+        String body = "grant_type=client_credentials"
+        conn.outputStream.withWriter("UTF-8") { it << body }
+
+        def response = conn.inputStream.text
+        def json = new JsonSlurper().parseText(response)
+
+        return json
+    }
+
+    def obtenerTokenValido(username, password, url_token) {
+
+        log.info("Obteniendo token....")
+
+        long now = System.currentTimeMillis() / 1000
+
+        if (tokenCache.token && now < tokenCache.expiration) {
+            return tokenCache.token
+        }
+
+        def response = obtenerToken(username, password, url_token)
+
+        tokenCache.token = response.access_token
+        tokenCache.expiration = now + response.expires_in - 30
+
+        log.info("Token obtenido correctamente")
+
+        return tokenCache.token
     }
 
     /**INVOCACION AL SERVICIO DE AMA PARA LISTADO DE POLIZAS
@@ -37,27 +96,50 @@ class BusquedaAmaService {
      * @throws MalformedURLException
      * @throws Exception
      */
-    def obtenerPolizas(pass, user, wsdlAma, params) throws MalformedURLException, NumberFormatException, RemoteException, Exception {
-        log.info("Entro al servicio")
-        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(wsdlAma)
+    def obtenerPolizas(api_user, api_pass, api_url_token, api_token_username, api_token_pass, api_wsdl_url, params)
+            throws MalformedURLException, NumberFormatException, RemoteException, Exception {
+
+        log.info("Obteniendo polizas para ama .....")
+
+        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(api_wsdl_url)
         ConsultaPolizasEnfermedadesStub.GetPolizasE rqGetPolizaE = new ConsultaPolizasEnfermedadesStub.GetPolizasE()
         ConsultaPolizasEnfermedadesStub.GetPolizas rqGetPoliza = new ConsultaPolizasEnfermedadesStub.GetPolizas()
-        log.info("Instancio: ConsultaPolizasEnfermedades")
 
         List<Header> namedValuePairs = new ArrayList<Header>()
-        namedValuePairs.add(new Header("USERNAME", user))
-        namedValuePairs.add(new Header("PASSWORD", pass))
+
+        namedValuePairs.add(new Header("Username", api_user))
+        namedValuePairs.add(new Header("Password", api_pass))
+
+        def token = obtenerTokenValido(api_token_username, api_token_pass, api_url_token)
+
+        namedValuePairs.add(new Header("Authorization", "Bearer " + token))
 
         ServiceClient sc = consPolizaStub._getServiceClient()
         Options opts = sc.getOptions()
+
+        // 🔹 Forzar endpoint (muy útil para debug)
+        opts.setTo(new org.apache.axis2.addressing.EndpointReference(api_wsdl_url))
+
+        // 🔹 Añadir headers
         opts.setProperty(HTTPConstants.HTTP_HEADERS, namedValuePairs)
+
+        // 🔹 Desactivar chunking (evita problemas con algunos servidores)
+        opts.setProperty(HTTPConstants.CHUNKED, false)
+
+        // 🔹 LOG endpoint real
+        log.info("Endpoint final: " + opts.getTo().getAddress())
+
+        // 🔹 LOG headers
+/*        namedValuePairs.each {
+            log.info("HEADER -> ${it.name}: ${it.value}")
+        }*/
 
         ConsultaPolizasEnfermedadesStub.PeticionConsulta req = new ConsultaPolizasEnfermedadesStub.PeticionConsulta()
         ConsultaPolizasEnfermedadesStub.IntervinienteSimple interviniente = new ConsultaPolizasEnfermedadesStub.IntervinienteSimple()
 
-        String apellidos = params.apellidos ? params.apellidos : null
-        String nombre = params.nombre ? params.nombre : null
-        String documento = params.documento ? params.documento : null
+        String apellidos = params.apellidos ?: null
+        String nombre = params.nombre ?: null
+        String documento = params.documento ?: null
 
         long mutualista = params.mutualista ? Long.parseLong(params.mutualista.toString().trim()) : 0
 
@@ -66,9 +148,10 @@ class BusquedaAmaService {
         interviniente.setNumeroDocumento(documento)
         interviniente.setNumeroMutualista(mutualista)
 
-        String codigoCia = params.cia ? params.cia : null
+        String codigoCia = params.cia ?: null
         int codigoPais = params.pais ? Integer.parseInt(params.pais) : 0
         int ramo = params.ramo ? Integer.parseInt(params.ramo) : 0
+
         String fecha = params.fecha
         if ("dd/MM/yyyy".equals(FechaUtils.getDateFormat(params.fecha))) {
             Date paramDate = Date.parse("dd/MM/yyyy", params.fecha)
@@ -77,46 +160,92 @@ class BusquedaAmaService {
             Date paramDate = Date.parse("dd-MM-yyyy", params.fecha)
             fecha = FechaUtils.dateToString(paramDate, "yyyy/MM/dd")
         }
+
         XMLGregorianCalendar fechaConsulta = params.fecha ? FechaUtils.fromStringToXmlCalendar(fecha) : null
-        Calendar calendario = fechaConsulta.toGregorianCalendar()
-        log.debug("Calendar:" + calendario.getTime().format("dd/MM/yyyy"))
+        Calendar calendario = fechaConsulta?.toGregorianCalendar()
+
         long poliza = params.poliza ? Long.parseLong(params.poliza.toString().trim()) : 0
         long suplemento = params.suplemento ? Long.parseLong(params.suplemento.toString().trim()) : -1
 
         req.setCodigoCompania(codigoCia)
         req.setCodigoPais(codigoPais)
         req.setCodigoRamo(ramo)
-        req.setFechaConsulta(calendario)
+
+        if (calendario) {
+            req.setFechaConsulta(calendario)
+        }
+
         if (interviniente.getNumeroDocumento() != null) {
             req.setInterviniente(interviniente)
         }
+
         req.setNumeroPoliza(poliza)
+
         if (suplemento > -1) {
             req.setNumeroSuplemento(suplemento)
         }
-        log.info("Insertamos todo los parametros en la request")
 
         rqGetPoliza.setArg0(req)
         rqGetPolizaE.setGetPolizas(rqGetPoliza)
 
-        return consPolizaStub.getPolizas(rqGetPolizaE).getGetPolizasResponse().get_return()
+        log.info("Fin obteniendo polizas para ama")
+
+
+        try {
+            def response = consPolizaStub.getPolizas(rqGetPolizaE)
+
+            return response.getGetPolizasResponse().get_return()
+
+        } catch (Exception e) {
+
+            log.error("❌ ERROR COMPLETO EN LLAMADA SOAP", e)
+
+            // Intentar sacar info adicional si existe
+            if (e.getMessage()) {
+                log.error("Mensaje error: " + e.getMessage())
+            }
+
+            throw e
+        }
     }
 
-    def obtenerPolizasNoVigentes(pass, user, wsdlAma, params) throws MalformedURLException, NumberFormatException, Exception {
+    def obtenerPolizasNoVigentes(api_user, api_pass, api_url_token, api_token_username, api_token_pass, api_wsdl_url, params) throws MalformedURLException, NumberFormatException, Exception {
 
+        log.info("Obteniendo polizas no viegenets para ama .....")
 
-        log.info("Entro al servicio")
-        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(wsdlAma)
+        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(api_wsdl_url)
         ConsultaPolizasEnfermedadesStub.GetPolizasNoVigentesE rqGetPolizaE = new ConsultaPolizasEnfermedadesStub.GetPolizasNoVigentesE()
         ConsultaPolizasEnfermedadesStub.GetPolizasNoVigentes rqGetPoliza = new ConsultaPolizasEnfermedadesStub.GetPolizasNoVigentes()
-        log.info("Insntacio :ConsultaPolizasEnfermedades")
 
         List<Header> namedValuePairs = new ArrayList<Header>()
-        namedValuePairs.add(new Header("USERNAME", user))
-        namedValuePairs.add(new Header("PASSWORD", pass))
+
+        namedValuePairs.add(new Header("Username", api_user))
+        namedValuePairs.add(new Header("Password", api_pass))
+
+        def token = obtenerTokenValido(api_token_username, api_token_pass, api_url_token)
+
+        namedValuePairs.add(new Header("Authorization", "Bearer " + token))
+
         ServiceClient sc = consPolizaStub._getServiceClient()
         Options opts = sc.getOptions()
+
+        // 🔹 Forzar endpoint (muy útil para debug)
+        opts.setTo(new org.apache.axis2.addressing.EndpointReference(api_wsdl_url))
+
+        // 🔹 Añadir headers
         opts.setProperty(HTTPConstants.HTTP_HEADERS, namedValuePairs)
+
+        // 🔹 Desactivar chunking (evita problemas con algunos servidores)
+        opts.setProperty(HTTPConstants.CHUNKED, false)
+
+        // 🔹 LOG endpoint real
+        log.info("Endpoint final: " + opts.getTo().getAddress())
+
+        // 🔹 LOG headers
+/*        namedValuePairs.each {
+            log.info("HEADER -> ${it.name}: ${it.value}")
+        }*/
+
 
         ConsultaPolizasEnfermedadesStub.PeticionNoVigentes req = new ConsultaPolizasEnfermedadesStub.PeticionNoVigentes()
         ConsultaPolizasEnfermedadesStub.IntervinienteSimple interviniente = new ConsultaPolizasEnfermedadesStub.IntervinienteSimple()
@@ -162,6 +291,8 @@ class BusquedaAmaService {
         rqGetPoliza.setArg0(req)
         rqGetPolizaE.setGetPolizasNoVigentes(rqGetPoliza)
 
+        log.info("Fin obteniendo polizas no viegenets para ama")
+
         return consPolizaStub.getPolizasNoVigentes(rqGetPolizaE).getGetPolizasNoVigentesResponse().get_return()
     }
 
@@ -192,24 +323,43 @@ class BusquedaAmaService {
      * @throws MalformedURLException
      * @throws Exception
      */
-    def informacionPoliza(pass, user, wsdlAma, params, fecha) throws MalformedURLException, Exception {
+    def informacionPoliza(api_user, api_pass, api_url_token, api_token_username, api_token_pass, api_wsdl_url, params) throws MalformedURLException, Exception {
 
+        log.info("Obteniendo informacion de polizas ama ......")
 
-        log.info("Entro al servicio")
-        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(wsdlAma)
+        ConsultaPolizasEnfermedadesStub consPolizaStub = new ConsultaPolizasEnfermedadesStub(api_wsdl_url)
         ConsultaPolizasEnfermedadesStub.GetDetallePolizaE rqGetPolizaE = new ConsultaPolizasEnfermedadesStub.GetDetallePolizaE()
         ConsultaPolizasEnfermedadesStub.GetDetallePoliza rqGetPoliza = new ConsultaPolizasEnfermedadesStub.GetDetallePoliza()
-        log.info("Instancio :ConsultaPolizasEnfermedades")
 
         List<Header> namedValuePairs = new ArrayList<Header>()
-        namedValuePairs.add(new Header("USERNAME", user))
-        namedValuePairs.add(new Header("PASSWORD", pass))
+
+        namedValuePairs.add(new Header("Username", api_user))
+        namedValuePairs.add(new Header("Password", api_pass))
+
+        def token = obtenerTokenValido(api_token_username, api_token_pass, api_url_token)
+
+        namedValuePairs.add(new Header("Authorization", "Bearer " + token))
+
         ServiceClient sc = consPolizaStub._getServiceClient()
         Options opts = sc.getOptions()
+
+        // 🔹 Forzar endpoint (muy útil para debug)
+        opts.setTo(new org.apache.axis2.addressing.EndpointReference(api_wsdl_url))
+
+        // 🔹 Añadir headers
         opts.setProperty(HTTPConstants.HTTP_HEADERS, namedValuePairs)
 
-        ConsultaPolizasEnfermedadesStub.PeticionNoVigentes req = new ConsultaPolizasEnfermedadesStub.PeticionNoVigentes()
-        ConsultaPolizasEnfermedadesStub.IntervinienteSimple interviniente = new ConsultaPolizasEnfermedadesStub.IntervinienteSimple()
+        // 🔹 Desactivar chunking (evita problemas con algunos servidores)
+        opts.setProperty(HTTPConstants.CHUNKED, false)
+
+        // 🔹 LOG endpoint real
+        log.info("Endpoint final: " + opts.getTo().getAddress())
+
+        // 🔹 LOG headers
+/*        namedValuePairs.each {
+            log.info("HEADER -> ${it.name}: ${it.value}")
+        }*/
+
 
         GregorianCalendar fCon = new GregorianCalendar();
         fCon.setTime(new Date());
@@ -235,8 +385,12 @@ class BusquedaAmaService {
         detalle.setNumeroPoliza(poliza)
         detalle.setNumeroSuplemento(suplemento)
 
+        log.info("Obteniendo informacion de poliza codigo_cia: "+codigoCia + ", codigoPais: " + codigoPais + ", ramo: " + ramo + ", certificado: " + certificado + ", poliza: " + poliza + ", suplemento: " + suplemento)
+
         rqGetPoliza.setArg0(detalle)
         rqGetPolizaE.setGetDetallePoliza(rqGetPoliza)
+
+        log.info("Fin obteniendo informacion de polizas ama ......")
 
         return consPolizaStub.getDetallePoliza(rqGetPolizaE).getDetallePolizaResponse.get_return()
     }

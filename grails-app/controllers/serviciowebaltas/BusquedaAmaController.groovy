@@ -8,6 +8,7 @@ import org.apache.commons.logging.Log
 import org.apache.commons.logging.LogFactory
 import org.springframework.security.access.annotation.Secured
 import serviciowebaltann.TransformacionUtils
+import serviciowebaltasnn.Conf
 
 import java.text.SimpleDateFormat
 
@@ -19,7 +20,6 @@ class BusquedaAmaController {
     ConsultaPolizasEnfermedadesStub.PolizaSimple[] polizas
     ConsultaPolizasEnfermedadesStub.RespuestaAuditada detallePoliza
     ConsultaPolizasEnfermedadesStub.Poliza poliza
-
     def CreacionExpedienteAsyncSRP_PortType conexionBpel
     def RootElement payload
     def springSecurityService
@@ -48,6 +48,8 @@ class BusquedaAmaController {
         [params: params]
     }
 
+
+
     /**METODO QUE EN FUNCION DE LOS DATOS INTRODUCIDOS DEVUELVE EL LISTADO DE POLIZAS ASOCIADO
      *
      * @param params
@@ -55,7 +57,7 @@ class BusquedaAmaController {
      */
     def buscar(params) {
 
-        log.info "Usuario_" + "- Obteniendo polizas para valores dni: " + params.documento + " y poliza: " + params.poliza
+        log.info("Obteniendo polizas para valores dni: " + params.documento + " y poliza: " + params.poliza)
 
         flash.error = null
         flash.message = null
@@ -63,11 +65,13 @@ class BusquedaAmaController {
 
         try {
 
-            respuestaConsulta = busquedaAmaService.obtenerPolizas(grailsApplication.config.ama.pass, grailsApplication.config.ama.user, grailsApplication.config.ama.wsdl, params)
+            def config = busquedaAmaService.getConfig()
+
+            respuestaConsulta = busquedaAmaService.obtenerPolizas(config.api_user, config.api_pass, config.api_url_token, config.api_token_username, config.api_token_pass, config.api_wsdl_url, params)
 
             if (respuestaConsulta.getResultadoOperacion().getResultado() == ConsultaPolizasEnfermedadesStub.TipoResultado.SUCCESS) {
 
-                log.info "Usuario_" + "-" + "La consutla ha devuelto polizas"
+                log.info("La consutla ha devuelto polizas")
                 session.setAttribute("resultadoOperacionConsulta", (ConsultaPolizasEnfermedadesStub.ResultadoOperacionConsulta) respuestaConsulta.getResultadoOperacion())
                 session.setAttribute("parametrosDeBusqueda", params)
                 //def result = (ConsultaPolizasEnfermedadesStub.ResultadoOperacionConsulta) respuestaConsulta?.getResultadoOperacion()
@@ -80,7 +84,7 @@ class BusquedaAmaController {
 
                     /**Cuando obtenemos este mensaje mostramos el contenido pero son polizas no vigentes
                      *                    */
-                    respuestaConsulta = busquedaAmaService.obtenerPolizasNoVigentes(grailsApplication.config.ama.pass, grailsApplication.config.ama.user, grailsApplication.config.ama.wsdl, params)
+                    respuestaConsulta = busquedaAmaService.obtenerPolizasNoVigentes(config.api_user, config.api_pass, config.api_url_token, config.api_token_username, config.api_token_pass, config.api_wsdl_url, params)
 
                     if (respuestaConsulta.getResultadoOperacion().getResultado() == ConsultaPolizasEnfermedadesStub.TipoResultado.ERROR) {
                         flash.error = busquedaAmaService.codificacionMensajes(respuestaConsulta.getResultadoOperacion().getMensajes().getMensaje())
@@ -91,8 +95,7 @@ class BusquedaAmaController {
                         log.info "Usuario_" + "-" + flash.message
                         render view: 'contenido', model: [flash: flash]
                     } else {
-                        log.info "Usuario_" + "-" + "La consulta ha devuelto polizas"
-                        log.info ("Resultado operacion: " +respuestaConsulta.getResultadoOperacion().getResultado())
+                        log.info("La consulta ha devuelto polizas")
 
                         session.setAttribute("resultadoOperacionConsulta", (ConsultaPolizasEnfermedadesStub.ResultadoOperacionConsulta) respuestaConsulta.getResultadoOperacion())
                         session.setAttribute("parametrosDeBusqueda", params)
@@ -171,8 +174,12 @@ class BusquedaAmaController {
      * @return
      */
     def resultados() {
+
+        def config = busquedaAmaService.getConfig()
+
         def listaPolizas = []
 
+        log.info("Mostrando resultados de polizas.....")
 
         resultadoOperacionConsulta = session.getAttribute("resultadoOperacionConsulta")
         parametrosDeBusqueda = session.getAttribute("parametrosDeBusqueda")
@@ -183,17 +190,14 @@ class BusquedaAmaController {
 
         if (resultadoOperacionConsulta?.getListadoPolizas() != null && resultadoOperacionConsulta?.getListadoPolizas().getPoliza() != null) {
             listaPolizas = resultadoOperacionConsulta?.getListadoPolizas().getPoliza()
-            log.info("resultadoOperacionConsulta?.getListadoPolizas() ${listaPolizas.each { it }}")
         } else {
             parametrosDeBusqueda = session.getAttribute("parametrosDeBusqueda")
-            detallePoliza = busquedaAmaService.informacionPoliza(grailsApplication.config.ama.pass, grailsApplication.config.ama.user, grailsApplication.config.ama.wsdl, params, parametrosDeBusqueda?.fecha)
-            log.info("detallePoliza?.getResultadoOperacionDetalle()?.getDetallePoliza()   ${detallePoliza?.getResultadoOperacionDetalle()?.getDetallePoliza()}")
+            detallePoliza = busquedaAmaService.informacionPoliza(config.api_user, config.api_pass, config.api_url_token, config.api_token_username, config.api_token_pass, config.api_wsdl_url, params)
             if (detallePoliza?.getResultadoOperacionDetalle()?.getDetallePoliza() != null)
                 listaPolizas.add(detallePoliza?.getResultadoOperacionDetalle()?.getDetallePoliza())
         }
 
         session.setAttribute("listaPolizasIniciales", listaPolizas)
-
 
         [polizas: listaPolizas]
     }
@@ -210,28 +214,30 @@ class BusquedaAmaController {
         flash.message = null
         session.setAttribute("msg", "")
 
-        log.info "Usuario_" + "- Obteniendo detalle poliza para valores dni: " + params.documento + " y poliza: " + params.poliza
+        def config = busquedaAmaService.getConfig()
+
+        log.info("Obteniendo detalles poliza para valores dni: " + params.documento + " y poliza: " + params.poliza)
         parametrosDeBusqueda = session.getAttribute("parametrosDeBusqueda")
 
         try {
 
-            detallePoliza = busquedaAmaService.informacionPoliza(grailsApplication.config.ama.pass, grailsApplication.config.ama.user, grailsApplication.config.ama.wsdl, params, parametrosDeBusqueda.fecha)
+            detallePoliza = busquedaAmaService.informacionPoliza(config.api_user, config.api_pass, config.api_url_token, config.api_token_username, config.api_token_pass, config.api_wsdl_url, params)
 
             if (detallePoliza.getResultadoOperacion().getResultado() == ConsultaPolizasEnfermedadesStub.TipoResultado.SUCCESS) {
 
-                log.info "Usuario_" + "-" + "La consutla ha devuelto el detalle de la poliza"
+                log.info("La consutla ha devuelto el detalle de la poliza")
             }
 
             if (detallePoliza.getResultadoOperacion().getResultado() == ConsultaPolizasEnfermedadesStub.TipoResultado.SUCCESS_WARN) {
                 flash.error = "No se han encontrado datos para la poliza"
-                log.info "Usuario_" + "-" + flash.error
-                [flash: flash]
+                log.info(flash.error)
+                return render(view: 'contenido', model: [flash: flash])
             }
 
             if (detallePoliza.getResultadoOperacion().getResultado() == ConsultaPolizasEnfermedadesStub.TipoResultado.ERROR) {
                 flash.error = detallePoliza.getResultadoOperacion().getMensajes().getMensaje()[0].getCodigoMensaje()
-                log.info "Usuario_" + "-" + flash.error
-                [flash: flash]
+                log.info(flash.error)
+                return render(view: 'contenido', model: [flash: flash])
             }
 
 
@@ -243,11 +249,10 @@ class BusquedaAmaController {
             intervinientes = []
 
             polizaSeleccionada = true
-            log.info("Completo poliza con detalle poliza")
             poliza = detallePoliza?.getResultadoOperacion()?.getDetallePoliza()
             /**SE RECUPERAN EXCLUSIONES
              *            */
-            log.info("Comienzo a ver exclusiones")
+            log.info("Listando exclusiones")
             if (poliza.getExclusiones() != null && poliza.getExclusiones().getExclusion() != null && poliza.getExclusiones().getExclusion().size() > 0) {
                 for (int i = 0; i < poliza.getExclusiones().getExclusion().size(); i++) {
                     exclusiones << poliza?.getExclusiones()?.getExclusion()?.getAt(i)
@@ -255,7 +260,7 @@ class BusquedaAmaController {
             }
             /**SE RECUPERAN GARANTIAS
              *            */
-            log.info("Comienzo a ver garantias")
+            log.info("Listando garantias")
             if (poliza.getGarantias() != null && poliza.getGarantias().getGarantia() != null && poliza.getGarantias().getGarantia().size() > 0) {
                 for (int i = 0; i < poliza.getGarantias().getGarantia().size(); i++) {
                     garantias << poliza?.getGarantias()?.getGarantia()?.getAt(i)
@@ -263,7 +268,7 @@ class BusquedaAmaController {
             }
             /**SE RECUPERAN INTERVINIENTES
              *            */
-            log.info("Comienzo a ver intervinientes")
+            log.info("Listando intervinientes")
             if (poliza.getIntervinientes() != null && poliza.getIntervinientes().getInterviniente() != null && poliza.getIntervinientes().getInterviniente().size() > 0) {
                 for (int i = 0; i < poliza.getIntervinientes().getInterviniente().size(); i++) {
                     intervinientes << poliza?.getIntervinientes()?.getInterviniente()?.getAt(i)
@@ -293,6 +298,8 @@ class BusquedaAmaController {
             flash.error = transformacionUtils.transformarTipoMensajesErrorAma(e.getMessage().toString())
             [flash: flash, params: params]
         }
+
+        log.info("Fin obteniendo detalles poliza para valores dni: " + params.documento + " y poliza: " + params.poliza)
     }
 
     /**METODO QUE INICIA LA CRACION DEL EXPEDIENTE

@@ -54,7 +54,7 @@ environments {
         dataSource {
             //BD local
             pooled = true
-            dbCreate = "validate" // one of 'create', 'create-drop','update'
+            dbCreate = "create-drop" // one of 'create', 'create-drop','update'
             username = "postgres"
             password = "postgres"
             url = "jdbc:postgresql://localhost:5432/webcitas_prepro_local"
