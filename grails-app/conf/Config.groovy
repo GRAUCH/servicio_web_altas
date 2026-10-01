@@ -330,7 +330,7 @@ environments {
             //client_id = 'e8b7068c-30ed-4ec0-90d4-cb0a93f52be6'
             //client_secret = '9b38Q~tHR-YU-mrOquvZT.zZ9Gm0uvPqPjj6Ba.R'
             client_id = '263bd2ea-6924-4427-bfaa-661949718702'
-            client_secret = 'yDO8Q~xuGklyYYmtcW02bIox.G39F5MTvD-08bWP'
+            client_secret = 'y.k8Q~k5HLHZeT3IdxYMl6CEzkLOHsIepw-3Pcmb'
 
             //productCode
             proCode = 'SENIOR'
